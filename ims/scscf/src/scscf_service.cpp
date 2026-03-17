@@ -3,6 +3,7 @@
 #include "ims/core/log.hpp"
 #include "ims/media/rtpengine_client.hpp"
 #include "ims/media/sdp_rewriter.hpp"
+#include "ims/policy/qos_hook.hpp"
 #include "ims/scscf/call_session.hpp"
 #include "ims/sip/sip_message.hpp"
 #include "ims/sip/sip_stack.hpp"
@@ -19,13 +20,15 @@ ScscfService::ScscfService(ims::sip::SipStack& sip,
                            ims::storage::LocationService& location,
                            ims::media::RtpEngineClient& rtpengine,
                            ims::media::SdpRewriter& sdp_rewriter,
-                           std::string realm)
+                           std::string realm,
+                           ims::policy::QosHook* qos_hook)
     : sip_(sip),
       auth_(auth),
       location_(location),
       rtpengine_(rtpengine),
       sdp_rewriter_(sdp_rewriter),
-      realm_(std::move(realm)) {}
+      realm_(std::move(realm)),
+      qos_hook_(qos_hook) {}
 
 void ScscfService::on_sip_message(const ims::sip::SipMessage& msg) {
   using ims::sip::Method;
@@ -49,6 +52,9 @@ void ScscfService::on_sip_message(const ims::sip::SipMessage& msg) {
       if (msg.start.status_code == 200) {
         cs.state = CallState::Established;
         cs.out_tid_2xx = msg.tid;
+        if (qos_hook_) {
+          qos_hook_->emit(ims::policy::SessionEvent{.type = ims::policy::SessionEventType::Established, .call_id = msg.call_id, .from = cs.from_aor, .to = cs.to_aor});
+        }
       }
     }
     return;
@@ -148,6 +154,10 @@ void ScscfService::handle_invite(const ims::sip::SipMessage& msg) {
   }
   cs.out_did = out_did;
   calls[msg.call_id] = cs;
+
+  if (qos_hook_) {
+    qos_hook_->emit(ims::policy::SessionEvent{.type = ims::policy::SessionEventType::Setup, .call_id = msg.call_id, .from = from, .to = to});
+  }
 }
 
 void ScscfService::handle_bye(const ims::sip::SipMessage& msg) {
@@ -159,6 +169,10 @@ void ScscfService::handle_bye(const ims::sip::SipMessage& msg) {
     calls.erase(it);
   }
   rtpengine_.remove(msg.call_id);
+
+  if (qos_hook_) {
+    qos_hook_->emit(ims::policy::SessionEvent{.type = ims::policy::SessionEventType::Teardown, .call_id = msg.call_id, .from = msg.from, .to = msg.to});
+  }
 }
 
 } // namespace ims::scscf

@@ -22,6 +22,10 @@ struct ProxyRouterConfig {
   // e.g. "sip:pcscf.ims.local:5060;transport=udp;lr"
   std::string self_uri{};
 
+  // Sent-by used for Via insertion when proxying requests.
+  // If empty, ProxyRouter will best-effort derive from self_uri (host[:port]).
+  std::string via_sent_by{};
+
   // If true, attempt to strip/normalize topology-revealing headers on forward/relay.
   bool topology_hiding{false};
 

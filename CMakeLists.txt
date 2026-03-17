@@ -49,6 +49,8 @@ target_sources(ims_lib PRIVATE
   ims/sip/src/sip_stack.cpp
   ims/sip/src/b2bua_relay.cpp
   ims/sip/src/proxy_router.cpp
+  ims/ipsec/src/xfrm_manager.cpp
+  ims/policy/src/qos_hook.cpp
   ims/storage/src/location_service.cpp
   ims/auth/src/auth_provider.cpp
   ims/scscf/src/registration_sm.cpp
@@ -69,6 +71,8 @@ target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/icscf/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/pcscf/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/media/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/ims/ipsec/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/ims/policy/include
 )
 target_link_libraries(ims_lib PUBLIC
   spdlog::spdlog

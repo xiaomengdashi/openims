@@ -36,6 +36,46 @@ struct AppConfig {
   SipEndpointConfig pcscf;
   SipEndpointConfig icscf;
   SipEndpointConfig scscf;
+  struct ProxyConfig {
+    // Publicly reachable SIP URI for this proxy hop (used in Record-Route/Path/topology hiding)
+    // e.g. "sip:pcscf.ims.local:5060;transport=udp;lr"
+    std::string self_uri{};
+    // Optional explicit Via sent-by (host[:port]) for forwarded requests
+    std::string via_sent_by{};
+    bool topology_hiding{false};
+    // Optional headers to inject if missing (P-CSCF basics)
+    std::string pani{};
+    std::string pvni{};
+    std::string pai{};
+  };
+  ProxyConfig pcscf_proxy;
+  ProxyConfig icscf_proxy;
+
+  struct IpsecConfig {
+    bool enabled{false};
+    // "xfrm" (static keys) for now
+    std::string mode{"xfrm"};
+    // xfrm config (UE<->P-CSCF)
+    std::string local_ip{};
+    std::string remote_ip{};
+    std::string spi_in{};
+    std::string spi_out{};
+    std::string enc_algo{"cbc(aes)"};
+    std::string enc_key_hex{};
+    std::string auth_algo{"hmac(sha256)"};
+    std::string auth_key_hex{};
+    int reqid{1};
+    int proto{17};
+    int local_port{5060};
+    int remote_port{0};
+  } ipsec;
+
+  struct QosHookConfig {
+    bool enabled{false};
+    // If set, will POST JSON events using curl(1).
+    std::string http_url{};
+    int http_timeout_ms{1500};
+  } qos;
   struct RoutingConfig {
     std::string pcscf_to_icscf_uri{"sip:127.0.0.1:5061;transport=udp"};
     std::string icscf_to_scscf_uri{"sip:127.0.0.1:5062;transport=udp"};

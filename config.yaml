@@ -2,9 +2,22 @@ realm: "ims.local"
 pcscf:
   bind_ip: "0.0.0.0"
   port: 5060
+pcscf_proxy:
+  # 对外可达的 P-CSCF URI（用于 Record-Route/Path）
+  # self_uri: "sip:pcscf.ims.local:5060;transport=udp;lr"
+  # 可选：显式 Via sent-by（host[:port]），为空则从 self_uri 推导
+  # via_sent_by: "pcscf.ims.local:5060"
+  topology_hiding: false
+  # 可选：缺省注入（如果 UE 未携带）
+  # pani: '3GPP-NR;utran-cell-id-3gpp=00000000000000000000000000000000'
+  # pvni: '"ims.mnc001.mcc460.3gppnetwork.org"'
+  # pai: '<sip:+8613800138000@ims.mnc001.mcc460.3gppnetwork.org>'
 icscf:
   bind_ip: "0.0.0.0"
   port: 5061
+icscf_proxy:
+  # via_sent_by: "icscf.ims.local:5061"
+  topology_hiding: false
 scscf:
   bind_ip: "0.0.0.0"
   port: 5062
@@ -27,4 +40,27 @@ auth:
       opc: "cd63cb71954a9f4e48a5994e37a02baf"
       sqn: "ff9bb4d0b607"
       amf: "b9b9"
+
+# Optional: IMS IPsec (static xfrm; requires root/NET_ADMIN)
+ipsec:
+  enabled: false
+  mode: "xfrm"
+  # local_ip: "192.168.1.10"   # P-CSCF IP
+  # remote_ip: "192.168.1.20"  # UE / ePDG side IP
+  # spi_in: "0x1001"
+  # spi_out: "0x1002"
+  # enc_algo: "cbc(aes)"
+  # enc_key_hex: "00112233445566778899aabbccddeeff"
+  # auth_algo: "hmac(sha256)"
+  # auth_key_hex: "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
+  reqid: 1
+  proto: 17
+  local_port: 5060
+  remote_port: 0
+
+# Optional: QoS / policy hook (HTTP via curl)
+qos:
+  enabled: false
+  # http_url: "http://127.0.0.1:8080/ims/qos"
+  http_timeout_ms: 1500
 

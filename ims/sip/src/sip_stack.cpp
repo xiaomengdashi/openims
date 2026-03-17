@@ -7,6 +7,7 @@
 #include <memory>
 
 #include <netinet/in.h>
+#include <unordered_set>
 
 #if IMS_HAS_EXOSIP
 #include <eXosip2/eXosip.h>
@@ -413,6 +414,146 @@ bool SipStack::send_out_of_dialog(const OutOfDialogRequest& req, int& out_tid) {
 #else
   (void)req;
   (void)out_tid;
+  return false;
+#endif
+}
+
+bool SipStack::proxy_forward_raw(const SipMessage& inbound,
+                                 const std::string& route_uri,
+                                 const std::string& via_sent_by,
+                                 const std::unordered_map<std::string, std::string>& add_headers,
+                                 bool topology_hiding,
+                                 int& out_tid) {
+#if IMS_HAS_EXOSIP
+  out_tid = 0;
+  if (!impl_->ctx) return false;
+  if (!inbound.start.is_request) return false;
+  if (inbound.raw.empty()) return false;
+
+  osip_message_t* msg = nullptr;
+  if (osip_message_init(&msg) != 0 || !msg) return false;
+  if (osip_message_parse(msg, inbound.raw.c_str(), static_cast<size_t>(inbound.raw.size())) != 0) {
+    osip_message_free(msg);
+    return false;
+  }
+
+  // Insert our Via at top (proxy behavior)
+  if (!via_sent_by.empty()) {
+    static std::atomic_uint64_t branch_ctr{1};
+    const auto b = branch_ctr.fetch_add(1);
+    const std::string via_val = "SIP/2.0/UDP " + via_sent_by + ";branch=z9hG4bKims-" + std::to_string(b) + ";rport";
+
+    osip_via_t* v = nullptr;
+    if (osip_via_init(&v) == 0 && v) {
+      if (osip_via_parse(v, via_val.c_str()) == 0) {
+        osip_list_add(&msg->vias, v, 0);
+      } else {
+        osip_via_free(v);
+      }
+    }
+  }
+
+  auto remove_all_headers_byname = [](osip_message_t* m, const char* name) {
+    if (!m || !name) return;
+    for (int i = 0; i < osip_list_size(&m->headers);) {
+      osip_header_t* h = (osip_header_t*)osip_list_get(&m->headers, i);
+      if (h && h->hname && osip_strcasecmp(h->hname, name) == 0) {
+        osip_list_remove(&m->headers, i);
+        osip_header_free(h);
+        continue;
+      }
+      ++i;
+    }
+  };
+
+  // Optionally strip topology-revealing headers (best-effort MVP)
+  if (topology_hiding) {
+    // Remove Route headers; proxy will steer using 'route_uri' next hop.
+    while (osip_list_size(&msg->routes) > 0) {
+      osip_route_t* r = (osip_route_t*)osip_list_get(&msg->routes, 0);
+      osip_list_remove(&msg->routes, 0);
+      osip_route_free(r);
+    }
+    // Remove existing Record-Route headers (keep only our own when added via add_headers)
+    while (osip_list_size(&msg->record_routes) > 0) {
+      osip_record_route_t* rr = (osip_record_route_t*)osip_list_get(&msg->record_routes, 0);
+      osip_list_remove(&msg->record_routes, 0);
+      osip_record_route_free(rr);
+    }
+    // Path is not exposed as a dedicated list in all libosip versions; remove via generic header list.
+    remove_all_headers_byname(msg, "Path");
+    remove_all_headers_byname(msg, "Route");
+    remove_all_headers_byname(msg, "Record-Route");
+  }
+
+  // Apply explicit header additions/overrides
+  for (const auto& [k, v] : add_headers) {
+    if (!k.empty() && !v.empty()) osip_message_set_header(msg, k.c_str(), v.c_str());
+  }
+
+  // Set next hop Route if provided
+  if (!route_uri.empty()) {
+    osip_message_set_route(msg, route_uri.c_str());
+  }
+
+  eXosip_lock(impl_->ctx);
+  const int tid = eXosip_message_send_request(impl_->ctx, msg);
+  eXosip_unlock(impl_->ctx);
+  if (tid <= 0) return false;
+  out_tid = tid;
+  return true;
+#else
+  (void)inbound;
+  (void)route_uri;
+  (void)add_headers;
+  (void)topology_hiding;
+  (void)out_tid;
+  return false;
+#endif
+}
+
+bool SipStack::proxy_relay_response(const SipMessage& upstream_req, const SipMessage& downstream_resp) {
+#if IMS_HAS_EXOSIP
+  if (!impl_->ctx || upstream_req.tid <= 0) return false;
+  if (downstream_resp.start.is_request) return false;
+
+  osip_message_t* answer = nullptr;
+  const int code = downstream_resp.start.status_code;
+  if (eXosip_message_build_answer(impl_->ctx, upstream_req.tid, code, &answer) != 0 || !answer) return false;
+
+  // Copy a minimal but useful header set from downstream response.
+  // (Do NOT copy Via; eXosip will build answer based on inbound transaction.)
+  static const std::unordered_set<std::string> copy_hdrs = {
+      "Contact",
+      "Record-Route",
+      "Service-Route",
+      "P-Associated-URI",
+      "P-Charging-Vector",
+      "P-Charging-Function-Addresses",
+      "Security-Server",
+      "Security-Verify",
+      "Supported",
+      "Require",
+  };
+
+  for (const auto& h : downstream_resp.headers) {
+    if (copy_hdrs.find(h.name) != copy_hdrs.end()) {
+      if (!h.value.empty()) osip_message_set_header(answer, h.name.c_str(), h.value.c_str());
+    }
+  }
+
+  if (!downstream_resp.body.empty()) {
+    osip_message_set_body(answer, downstream_resp.body.c_str(), static_cast<int>(downstream_resp.body.size()));
+    osip_message_set_content_type(answer, downstream_resp.content_type.empty() ? "application/sdp" : downstream_resp.content_type.c_str());
+  }
+
+  eXosip_lock(impl_->ctx);
+  const int rc = eXosip_message_send_answer(impl_->ctx, upstream_req.tid, code, answer);
+  eXosip_unlock(impl_->ctx);
+  return rc == 0;
+#else
+  (void)upstream_req;
+  (void)downstream_resp;
   return false;
 #endif
 }

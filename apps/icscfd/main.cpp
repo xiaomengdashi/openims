@@ -24,7 +24,9 @@ int main(int argc, char** argv) {
       ims::sip::ProxyRouterConfig{
           .realm = cfg.realm,
           .upstream_route_uri = cfg.routing.icscf_to_scscf_uri,
-          .self_uri = "sip:icscf." + cfg.realm + ":" + std::to_string(cfg.icscf.port) + ";transport=udp;lr",
+          .self_uri = cfg.icscf_proxy.self_uri.empty() ? ("sip:icscf." + cfg.realm + ":" + std::to_string(cfg.icscf.port) + ";transport=udp;lr") : cfg.icscf_proxy.self_uri,
+          .via_sent_by = cfg.icscf_proxy.via_sent_by,
+          .topology_hiding = cfg.icscf_proxy.topology_hiding,
       });
 
   sip.set_on_message([&](const ims::sip::SipMessage& msg) { proxy.on_message(msg); });

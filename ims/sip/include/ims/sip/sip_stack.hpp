@@ -45,6 +45,17 @@ public:
   bool send_bye(int did);
   bool forward_request(const SipMessage& req, const std::string& target_uri);
   bool send_out_of_dialog(const OutOfDialogRequest& req, int& out_tid);
+  // Proxy-grade forwarding: parse raw SIP, apply minimal proxy header rules, and send using Route (next hop).
+  // Returns downstream transaction id in out_tid.
+  bool proxy_forward_raw(const SipMessage& inbound,
+                         const std::string& route_uri,
+                         const std::string& via_sent_by,
+                         const std::unordered_map<std::string, std::string>& add_headers,
+                         bool topology_hiding,
+                         int& out_tid);
+
+  // Build and send an answer to inbound request, copying selected headers/body from downstream response.
+  bool proxy_relay_response(const SipMessage& upstream_req, const SipMessage& downstream_resp);
 
 private:
   struct Impl;

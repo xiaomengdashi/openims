@@ -19,12 +19,54 @@ static RtpEngineConfig parse_rtpengine(const YAML::Node& n, RtpEngineConfig def)
   return def;
 }
 
+static AppConfig::ProxyConfig parse_proxy(const YAML::Node& n, AppConfig::ProxyConfig def) {
+  if (!n) return def;
+  if (n["self_uri"]) def.self_uri = n["self_uri"].as<std::string>();
+  if (n["via_sent_by"]) def.via_sent_by = n["via_sent_by"].as<std::string>();
+  if (n["topology_hiding"]) def.topology_hiding = n["topology_hiding"].as<bool>();
+  if (n["pani"]) def.pani = n["pani"].as<std::string>();
+  if (n["pvni"]) def.pvni = n["pvni"].as<std::string>();
+  if (n["pai"]) def.pai = n["pai"].as<std::string>();
+  return def;
+}
+
+static AppConfig::IpsecConfig parse_ipsec(const YAML::Node& n, AppConfig::IpsecConfig def) {
+  if (!n) return def;
+  if (n["enabled"]) def.enabled = n["enabled"].as<bool>();
+  if (n["mode"]) def.mode = n["mode"].as<std::string>();
+  if (n["local_ip"]) def.local_ip = n["local_ip"].as<std::string>();
+  if (n["remote_ip"]) def.remote_ip = n["remote_ip"].as<std::string>();
+  if (n["spi_in"]) def.spi_in = n["spi_in"].as<std::string>();
+  if (n["spi_out"]) def.spi_out = n["spi_out"].as<std::string>();
+  if (n["enc_algo"]) def.enc_algo = n["enc_algo"].as<std::string>();
+  if (n["enc_key_hex"]) def.enc_key_hex = n["enc_key_hex"].as<std::string>();
+  if (n["auth_algo"]) def.auth_algo = n["auth_algo"].as<std::string>();
+  if (n["auth_key_hex"]) def.auth_key_hex = n["auth_key_hex"].as<std::string>();
+  if (n["reqid"]) def.reqid = n["reqid"].as<int>();
+  if (n["proto"]) def.proto = n["proto"].as<int>();
+  if (n["local_port"]) def.local_port = n["local_port"].as<int>();
+  if (n["remote_port"]) def.remote_port = n["remote_port"].as<int>();
+  return def;
+}
+
+static AppConfig::QosHookConfig parse_qos(const YAML::Node& n, AppConfig::QosHookConfig def) {
+  if (!n) return def;
+  if (n["enabled"]) def.enabled = n["enabled"].as<bool>();
+  if (n["http_url"]) def.http_url = n["http_url"].as<std::string>();
+  if (n["http_timeout_ms"]) def.http_timeout_ms = n["http_timeout_ms"].as<int>();
+  return def;
+}
+
 AppConfig load_config(const std::string& path) {
   AppConfig cfg{};
   YAML::Node root = YAML::LoadFile(path);
   cfg.pcscf = parse_sip_endpoint(root["pcscf"], cfg.pcscf);
   cfg.icscf = parse_sip_endpoint(root["icscf"], cfg.icscf);
   cfg.scscf = parse_sip_endpoint(root["scscf"], cfg.scscf);
+  cfg.pcscf_proxy = parse_proxy(root["pcscf_proxy"], cfg.pcscf_proxy);
+  cfg.icscf_proxy = parse_proxy(root["icscf_proxy"], cfg.icscf_proxy);
+  cfg.ipsec = parse_ipsec(root["ipsec"], cfg.ipsec);
+  cfg.qos = parse_qos(root["qos"], cfg.qos);
   if (root["routing"]) {
     if (root["routing"]["pcscf_to_icscf_uri"]) cfg.routing.pcscf_to_icscf_uri = root["routing"]["pcscf_to_icscf_uri"].as<std::string>();
     if (root["routing"]["icscf_to_scscf_uri"]) cfg.routing.icscf_to_scscf_uri = root["routing"]["icscf_to_scscf_uri"].as<std::string>();
