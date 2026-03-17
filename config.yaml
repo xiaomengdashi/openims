@@ -1,0 +1,30 @@
+realm: "ims.local"
+pcscf:
+  bind_ip: "0.0.0.0"
+  port: 5060
+icscf:
+  bind_ip: "0.0.0.0"
+  port: 5061
+scscf:
+  bind_ip: "0.0.0.0"
+  port: 5062
+routing:
+  pcscf_to_icscf_uri: "sip:127.0.0.1:5061;transport=udp"
+  icscf_to_scscf_uri: "sip:127.0.0.1:5062;transport=udp"
+rtpengine:
+  control_ip: "127.0.0.1"
+  control_port: 2223
+  media_public_ip: "127.0.0.1"
+auth:
+  mode: "aka"
+  users:
+    a: "a"
+    b: "b"
+  users_aka:
+    "001010123456789":
+      # 示例：请替换为 USIM/UDM 中对应的 K/OPc/SQN
+      k: "465b5ce8b199b49faa5f0a2ee238a6bc"
+      opc: "cd63cb71954a9f4e48a5994e37a02baf"
+      sqn: "ff9bb4d0b607"
+      amf: "b9b9"
+

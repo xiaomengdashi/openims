@@ -1,0 +1,39 @@
+# Build directories
+/build/
+/build-*/
+/cmake-build-*/
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+
+# Ninja
+.ninja_deps
+.ninja_log
+
+# IDEs
+.idea/
+.vscode/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Object files and binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+build-exosip
+libexosip2-5.3.0.tar.gz
+libosip2-5.3.0.tar.gz

@@ -1,0 +1,33 @@
+#include "ims/core/config.hpp"
+#include "ims/core/log.hpp"
+#include "ims/sip/b2bua_relay.hpp"
+#include "ims/sip/sip_stack.hpp"
+
+#include <chrono>
+#include <thread>
+
+int main(int argc, char** argv) {
+  ims::core::init_logging();
+  const char* cfg_path = (argc >= 2) ? argv[1] : "config.yaml";
+
+  ims::core::AppConfig cfg{};
+  try {
+    cfg = ims::core::load_config(cfg_path);
+  } catch (const std::exception& e) {
+    ims::core::log()->error("Load config failed: {}", e.what());
+    return 1;
+  }
+
+  ims::sip::SipStack sip;
+  ims::sip::B2buaRelay relay(sip, ims::sip::B2buaRelayConfig{.realm = cfg.realm, .next_hop_uri = cfg.routing.pcscf_to_icscf_uri});
+
+  sip.set_on_message([&](const ims::sip::SipMessage& msg) { relay.on_message(msg); });
+  if (!sip.start_udp(cfg.pcscf.bind_ip, cfg.pcscf.port)) return 2;
+  ims::core::log()->info("pcscfd started {}:{}", cfg.pcscf.bind_ip, cfg.pcscf.port);
+
+  while (true) {
+    sip.poll_once(200);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+}
+
