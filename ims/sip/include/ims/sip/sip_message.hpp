@@ -1,11 +1,17 @@
 #pragma once
 
+#include <vector>
 #include <optional>
 #include <string>
 
 namespace ims::sip {
 
 enum class Method { Register, Invite, Ack, Bye, Unknown };
+
+struct SipHeader {
+  std::string name;
+  std::string value;
+};
 
 struct SipStartLine {
   bool is_request{true};
@@ -34,10 +40,13 @@ struct SipMessage {
   std::string www_authenticate;
   std::string body;
   std::string content_type;
+  // 解析后的全量头域（按收到顺序保存）；用于代理转发/头域操作
+  std::vector<SipHeader> headers;
   // 原始 SIP 报文（用于需要完整头域时重建/转发）；可能为空
   std::string raw;
 
   std::optional<std::string> get_header(const std::string& name) const;
+  std::vector<std::string> get_headers(const std::string& name) const;
 };
 
 Method parse_method(const std::string& m);

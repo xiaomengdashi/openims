@@ -48,6 +48,7 @@ target_sources(ims_lib PRIVATE
   ims/sip/src/sip_message.cpp
   ims/sip/src/sip_stack.cpp
   ims/sip/src/b2bua_relay.cpp
+  ims/sip/src/proxy_router.cpp
   ims/storage/src/location_service.cpp
   ims/auth/src/auth_provider.cpp
   ims/scscf/src/registration_sm.cpp

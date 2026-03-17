@@ -133,6 +133,17 @@ static SipMessage adapt_message(osip_message_t* msg) {
     if (body && body->body) out.body = body->body;
   }
 
+  // Capture all headers in order (for proxying / header-chain logic)
+  // Note: osip stores "unknown" headers in msg->headers; well-known headers may also appear there.
+  for (int i = 0;; ++i) {
+    osip_header_t* hh = nullptr;
+    if (osip_message_get_header(msg, i, &hh) != 0 || !hh) break;
+    SipHeader sh{};
+    if (hh->hname) sh.name = hh->hname;
+    if (hh->hvalue) sh.value = hh->hvalue;
+    if (!sh.name.empty()) out.headers.push_back(std::move(sh));
+  }
+
   return out;
 }
 #endif

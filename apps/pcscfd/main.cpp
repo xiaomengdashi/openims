@@ -1,6 +1,6 @@
 #include "ims/core/config.hpp"
 #include "ims/core/log.hpp"
-#include "ims/sip/b2bua_relay.hpp"
+#include "ims/sip/proxy_router.hpp"
 #include "ims/sip/sip_stack.hpp"
 
 #include <chrono>
@@ -19,9 +19,15 @@ int main(int argc, char** argv) {
   }
 
   ims::sip::SipStack sip;
-  ims::sip::B2buaRelay relay(sip, ims::sip::B2buaRelayConfig{.realm = cfg.realm, .next_hop_uri = cfg.routing.pcscf_to_icscf_uri});
+  ims::sip::ProxyRouter proxy(
+      sip,
+      ims::sip::ProxyRouterConfig{
+          .realm = cfg.realm,
+          .upstream_route_uri = cfg.routing.pcscf_to_icscf_uri,
+          .self_uri = "sip:pcscf." + cfg.realm + ":" + std::to_string(cfg.pcscf.port) + ";transport=udp;lr",
+      });
 
-  sip.set_on_message([&](const ims::sip::SipMessage& msg) { relay.on_message(msg); });
+  sip.set_on_message([&](const ims::sip::SipMessage& msg) { proxy.on_message(msg); });
   if (!sip.start_udp(cfg.pcscf.bind_ip, cfg.pcscf.port)) return 2;
   ims::core::log()->info("pcscfd started {}:{}", cfg.pcscf.bind_ip, cfg.pcscf.port);
 
