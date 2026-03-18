@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <mutex>
 
 namespace ims::auth {
 
@@ -36,13 +37,16 @@ public:
 // RFC2617 Digest(MD5) 鉴权：从配置加载用户密码，生成 nonce 并校验 Authorization
 class DigestAuthProvider final : public IAuthProvider {
 public:
-  explicit DigestAuthProvider(std::unordered_map<std::string, std::string> user_passwords);
+  explicit DigestAuthProvider(std::unordered_map<std::string, std::string> user_passwords, bool ipsec_enabled = false);
 
   std::optional<AuthChallenge> getChallenge(const AuthRequest& req) override;
   bool verifyResponse(const AuthResponse& rsp) override;
 
 private:
   std::unordered_map<std::string, std::string> user_passwords_;
+  bool ipsec_enabled_;
+  // Track nonces for which we sent integrity-protected="yes"
+  std::unordered_map<std::string, bool> nonce_integrity_required_;
 };
 
 // 3GPP IMS AKA（AKAv1-MD5）鉴权：
@@ -60,7 +64,7 @@ struct AkaUserProfile {
 
 class AkaAuthProvider final : public IAuthProvider {
 public:
-  explicit AkaAuthProvider(std::unordered_map<std::string, AkaUserProfile> users);
+  explicit AkaAuthProvider(std::unordered_map<std::string, AkaUserProfile> users, bool ipsec_enabled = false);
 
   std::optional<AuthChallenge> getChallenge(const AuthRequest& req) override;
   bool verifyResponse(const AuthResponse& rsp) override;
@@ -75,6 +79,9 @@ private:
 
   std::unordered_map<std::string, AkaUserProfile> users_;
   std::unordered_map<std::string, NonceState> nonce_db_;
+  std::unordered_map<std::string, uint64_t> current_sqn_; // 存储每个用户的当前 SQN（内存存储）
+  mutable std::mutex sqn_mutex_; // 用于保护 current_sqn_ 的线程安全访问
+  bool ipsec_enabled_;
 };
 
 } // namespace ims::auth

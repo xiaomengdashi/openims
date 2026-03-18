@@ -2,6 +2,10 @@
 #include "ims/core/config.hpp"
 #include "ims/core/log.hpp"
 
+#define LOG_ERROR(...) ims::core::log()->error(__VA_ARGS__)
+#define LOG_INFO(...) ims::core::log()->info(__VA_ARGS__)
+#define LOG_DEBUG(...) ims::core::log()->debug(__VA_ARGS__)
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>

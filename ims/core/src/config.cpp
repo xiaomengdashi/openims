@@ -69,9 +69,59 @@ static DhcpConfig parse_dhcp(const YAML::Node& n, DhcpConfig def) {
   return def;
 }
 
+static DnsConfig parse_dns(const YAML::Node& n, DnsConfig def) {
+  if (!n) return def;
+  if (n["enabled"]) def.enabled = n["enabled"].as<bool>();
+  if (n["servers"]) {
+    for (const auto& server : n["servers"]) {
+      def.servers.push_back(server.as<std::string>());
+    }
+  }
+  if (n["search_domains"]) {
+    for (const auto& domain : n["search_domains"]) {
+      def.search_domains.push_back(domain.as<std::string>());
+    }
+  }
+  if (n["timeout_ms"]) def.timeout_ms = n["timeout_ms"].as<int>();
+  return def;
+}
+
+static CxConfig parse_cx(const YAML::Node& n, CxConfig def) {
+  if (!n) return def;
+  if (n["server_uri"]) def.server_uri = n["server_uri"].as<std::string>();
+  if (n["realm"]) def.realm = n["realm"].as<std::string>();
+  if (n["host"]) def.host = n["host"].as<std::string>();
+  if (n["default_capabilities"]) {
+    const auto& caps = n["default_capabilities"];
+    if (caps["mandatory_capabilities"]) {
+      for (const auto& cap : caps["mandatory_capabilities"]) {
+        def.default_capabilities.mandatory_capabilities.push_back(cap.as<int>());
+      }
+    }
+    if (caps["optional_capabilities"]) {
+      for (const auto& cap : caps["optional_capabilities"]) {
+        def.default_capabilities.optional_capabilities.push_back(cap.as<int>());
+      }
+    }
+    if (caps["mandatory_server_names"]) {
+      for (const auto& name : caps["mandatory_server_names"]) {
+        def.default_capabilities.mandatory_server_names.push_back(name.as<std::string>());
+      }
+    }
+    if (caps["optional_server_names"]) {
+      for (const auto& name : caps["optional_server_names"]) {
+        def.default_capabilities.optional_server_names.push_back(name.as<std::string>());
+      }
+    }
+  }
+  return def;
+}
+
 AppConfig load_config(const std::string& path) {
   AppConfig cfg{};
   YAML::Node root = YAML::LoadFile(path);
+  cfg.cx = parse_cx(root["cx"], cfg.cx);
+  cfg.dns = parse_dns(root["dns"], cfg.dns);
   cfg.pcscf = parse_sip_endpoint(root["pcscf"], cfg.pcscf);
   cfg.icscf = parse_sip_endpoint(root["icscf"], cfg.icscf);
   cfg.scscf = parse_sip_endpoint(root["scscf"], cfg.scscf);

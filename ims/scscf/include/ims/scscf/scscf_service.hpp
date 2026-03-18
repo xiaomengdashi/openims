@@ -20,12 +20,17 @@ namespace ims::policy {
 class QosHook;
 }
 
+namespace ims::cx {
+class ICxClient;
+} // namespace ims::cx
+
 namespace ims::scscf {
 
 class ScscfService {
 public:
   ScscfService(ims::sip::SipStack& sip,
               ims::auth::IAuthProvider& auth,
+              ims::cx::ICxClient& cx,
               ims::storage::LocationService& location,
               ims::media::RtpEngineClient& rtpengine,
               ims::media::SdpRewriter& sdp_rewriter,
@@ -41,6 +46,7 @@ private:
 
   ims::sip::SipStack& sip_;
   ims::auth::IAuthProvider& auth_;
+  ims::cx::ICxClient& cx_;
   ims::storage::LocationService& location_;
   ims::media::RtpEngineClient& rtpengine_;
   ims::media::SdpRewriter& sdp_rewriter_;

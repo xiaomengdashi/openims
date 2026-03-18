@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace ims::core {
 
@@ -42,10 +43,39 @@ struct DhcpConfig {
   int lease_time_seconds{3600};
 };
 
+struct DnsConfig {
+  bool enabled{false};
+  // DNS server addresses (optional, system DNS used if empty)
+  std::vector<std::string> servers;
+  // Search domains (optional)
+  std::vector<std::string> search_domains;
+  // Timeout in milliseconds (default 5000ms)
+  int timeout_ms{5000};
+};
+
+struct CxConfig {
+  // HSS server URI (for Diameter)
+  std::string server_uri{""};
+  // HSS realm (for Diameter)
+  std::string realm{"ims.hss.local"};
+  // Default HSS host (for Diameter)
+  std::string host{"hss.ims.local"};
+
+  // Default S-CSCF capabilities for Cx (UAR) response (3GPP TS 24.229)
+  struct ServerCapabilities {
+    std::vector<int> mandatory_capabilities;
+    std::vector<int> optional_capabilities;
+    std::vector<std::string> mandatory_server_names;
+    std::vector<std::string> optional_server_names;
+  };
+  ServerCapabilities default_capabilities;
+};
+
 struct AppConfig {
   SipEndpointConfig pcscf;
   SipEndpointConfig icscf;
   SipEndpointConfig scscf;
+  DnsConfig dns;
   struct ProxyConfig {
     // Publicly reachable SIP URI for this proxy hop (used in Record-Route/Path/topology hiding)
     // e.g. "sip:pcscf.ims.local:5060;transport=udp;lr"
@@ -92,6 +122,7 @@ struct AppConfig {
   } routing;
   RtpEngineConfig rtpengine;
   AuthConfig auth;
+  CxConfig cx;
   DhcpConfig dhcp;
   std::string realm{"ims.local"};
 };

@@ -53,6 +53,7 @@ target_sources(ims_lib PRIVATE
   ims/policy/src/qos_hook.cpp
   ims/storage/src/location_service.cpp
   ims/auth/src/auth_provider.cpp
+  ims/cx/src/cx_stub_client.cpp
   ims/scscf/src/registration_sm.cpp
   ims/scscf/src/call_session.cpp
   ims/scscf/src/scscf_service.cpp
@@ -61,12 +62,14 @@ target_sources(ims_lib PRIVATE
   ims/media/src/rtpengine_client.cpp
   ims/media/src/sdp_rewriter.cpp
   ims/dhcp/src/dhcp_server.cpp
+  ims/dns/src/dns_resolver.cpp
 )
 target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/core/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/sip/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/auth/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/ims/cx/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/storage/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/scscf/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/icscf/include
@@ -75,12 +78,25 @@ target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/ipsec/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/policy/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/dhcp/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/ims/dns/include
 )
 target_link_libraries(ims_lib PUBLIC
   spdlog::spdlog
   yaml-cpp::yaml-cpp
   OpenSSL::Crypto
 )
+
+# c-ares for DNS resolution (use older version for NAPTR/SRV query support)
+FetchContent_Declare(
+  c-ares
+  GIT_REPOSITORY https://github.com/c-ares/c-ares.git
+  GIT_TAG cares-1_19_0
+)
+set(CARES_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(CARES_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(CARES_BUILD_STATIC ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(c-ares)
+target_link_libraries(ims_lib PUBLIC c-ares::cares)
 
 if (NOT IMS_WITH_EXOSIP)
   message(FATAL_ERROR "IMS_WITH_EXOSIP=OFF is not supported (no stubs/mocks allowed). Please build with IMS_WITH_EXOSIP=ON.")
@@ -149,7 +165,7 @@ if (IMS_WITH_EXOSIP)
     ExternalProject_Add(exosip2_ep
       PREFIX ${EXOSIP_PREFIX}
       GIT_REPOSITORY https://git.savannah.nongnu.org/git/exosip.git
-      GIT_TAG master
+      GIT_TAG 5.3.0
       UPDATE_COMMAND ""
       INSTALL_DIR ${EXOSIP_INSTALL_DIR}
       CONFIGURE_COMMAND sh -c "cd <SOURCE_DIR> && autoreconf -fi && PKG_CONFIG_PATH=${OSIP_INSTALL_DIR}/lib/pkgconfig CPPFLAGS=-I${OSIP_INSTALL_DIR}/include LDFLAGS=-L${OSIP_INSTALL_DIR}/lib ./configure --prefix=<INSTALL_DIR> --with-osip=${OSIP_INSTALL_DIR}"

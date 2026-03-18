@@ -1,6 +1,8 @@
 #include "ims/auth/auth_provider.hpp"
 #include "ims/core/config.hpp"
 #include "ims/core/log.hpp"
+#include "ims/cx/cx_client.hpp"
+#include "ims/dns/dns_resolver.hpp"
 #include "ims/media/rtpengine_client.hpp"
 #include "ims/media/sdp_rewriter.hpp"
 #include "ims/icscf/icscf_service.hpp"
@@ -58,18 +60,58 @@ int main(int argc, char** argv) {
   ims::storage::LocationService location;
   std::unique_ptr<ims::auth::IAuthProvider> auth;
   if (cfg.auth.mode == "md5") {
-    auth = std::make_unique<ims::auth::DigestAuthProvider>(cfg.auth.users);
+    auth = std::make_unique<ims::auth::DigestAuthProvider>(cfg.auth.users, cfg.ipsec.enabled);
   } else {
     std::unordered_map<std::string, ims::auth::AkaUserProfile> aka_users;
     for (const auto& [impi, p] : cfg.auth.users_aka) {
       aka_users[impi] = ims::auth::AkaUserProfile{.k_hex = p.k_hex, .opc_hex = p.opc_hex, .sqn_hex = p.sqn_hex, .amf_hex = p.amf_hex};
     }
-    auth = std::make_unique<ims::auth::AkaAuthProvider>(std::move(aka_users));
+    auth = std::make_unique<ims::auth::AkaAuthProvider>(std::move(aka_users), cfg.ipsec.enabled);
   }
   ims::media::RtpEngineClient rtpengine(cfg.rtpengine.control_ip, cfg.rtpengine.control_port, cfg.rtpengine.media_public_ip);
   ims::media::SdpRewriter sdp_rewriter;
-  ims::scscf::ScscfService scscf(sip, *auth, location, rtpengine, sdp_rewriter, cfg.realm, &qos_hook);
-  ims::icscf::IcscfService icscf(sip, scscf, ims::icscf::IcscfConfig{});
+
+  // Create Cx client (stub)
+  std::unordered_map<std::string, ims::auth::AkaUserProfile> aka_users;
+  for (const auto& [impi, p] : cfg.auth.users_aka) {
+    aka_users[impi] = ims::auth::AkaUserProfile{.k_hex = p.k_hex, .opc_hex = p.opc_hex, .sqn_hex = p.sqn_hex, .amf_hex = p.amf_hex};
+  }
+  // Convert Cx capabilities from config
+  ims::cx::ServerCapabilities default_caps{};
+  for (const auto& cap : cfg.cx.default_capabilities.mandatory_capabilities) {
+    default_caps.mandatory_capabilities.push_back(cap);
+  }
+  for (const auto& cap : cfg.cx.default_capabilities.optional_capabilities) {
+    default_caps.optional_capabilities.push_back(cap);
+  }
+  for (const auto& name : cfg.cx.default_capabilities.mandatory_server_names) {
+    default_caps.mandatory_server_names.push_back(name);
+  }
+  for (const auto& name : cfg.cx.default_capabilities.optional_server_names) {
+    default_caps.optional_server_names.push_back(name);
+  }
+  ims::cx::StubCxClient cx_client(ims::cx::StubCxClient::Config{
+      .scscf_uri = cfg.routing.icscf_to_scscf_uri,
+      .aka_users = std::move(aka_users),
+      .md5_users = cfg.auth.users,
+      .default_capabilities = std::move(default_caps),
+  });
+
+  // Create S-CSCF with Cx client
+  ims::scscf::ScscfService scscf(sip, *auth, cx_client, location, rtpengine, sdp_rewriter, cfg.realm, &qos_hook);
+
+  // Create DNS resolver if enabled
+  std::unique_ptr<ims::dns::DnsResolver> dns_resolver;
+  if (cfg.dns.enabled) {
+    ims::dns::DnsResolver::Config dns_cfg;
+    dns_cfg.servers = cfg.dns.servers;
+    dns_cfg.timeout_ms = cfg.dns.timeout_ms;
+    dns_resolver = std::make_unique<ims::dns::DnsResolver>(dns_cfg);
+  }
+
+  ims::icscf::IcscfService icscf(sip, scscf, cx_client, dns_resolver.get(), ims::icscf::IcscfConfig{
+      .scscf_sip_uri = cfg.routing.icscf_to_scscf_uri
+  });
   ims::pcscf::PcscfService pcscf(sip, icscf);
 
   sip.set_on_message([&](const ims::sip::SipMessage& msg) { pcscf.on_sip_message(msg); });

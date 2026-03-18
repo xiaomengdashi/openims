@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 namespace ims::sip {
@@ -10,6 +11,14 @@ struct SipMessage;
 namespace ims::scscf {
 class ScscfService;
 } // namespace ims::scscf
+
+namespace ims::cx {
+class ICxClient;
+} // namespace ims::cx
+
+namespace ims::dns {
+class DnsResolver;
+} // namespace ims::dns
 
 namespace ims::icscf {
 
@@ -22,13 +31,16 @@ struct IcscfConfig {
 // I-CSCF：入域路由与 S-CSCF 选择（MVP：配置驱动；后续可扩展 Diameter Cx/UDM 选择）
 class IcscfService {
 public:
-  IcscfService(ims::sip::SipStack& sip, ims::scscf::ScscfService& scscf, IcscfConfig cfg);
+  IcscfService(ims::sip::SipStack& sip, ims::scscf::ScscfService& scscf,
+               ims::cx::ICxClient& cx, ims::dns::DnsResolver* dns, IcscfConfig cfg);
 
   void on_sip_message(const ims::sip::SipMessage& msg);
 
 private:
   ims::sip::SipStack& sip_;
   ims::scscf::ScscfService& scscf_;
+  ims::cx::ICxClient& cx_;
+  ims::dns::DnsResolver* dns_;
   IcscfConfig cfg_;
 };
 

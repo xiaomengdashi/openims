@@ -1,6 +1,7 @@
 #include "ims/scscf/scscf_service.hpp"
 
 #include "ims/core/log.hpp"
+#include "ims/cx/cx_client.hpp"
 #include "ims/media/rtpengine_client.hpp"
 #include "ims/media/sdp_rewriter.hpp"
 #include "ims/policy/qos_hook.hpp"
@@ -17,6 +18,7 @@ static std::unordered_map<std::string, CallSession>& call_map() {
 
 ScscfService::ScscfService(ims::sip::SipStack& sip,
                            ims::auth::IAuthProvider& auth,
+                           ims::cx::ICxClient& cx,
                            ims::storage::LocationService& location,
                            ims::media::RtpEngineClient& rtpengine,
                            ims::media::SdpRewriter& sdp_rewriter,
@@ -24,6 +26,7 @@ ScscfService::ScscfService(ims::sip::SipStack& sip,
                            ims::policy::QosHook* qos_hook)
     : sip_(sip),
       auth_(auth),
+      cx_(cx),
       location_(location),
       rtpengine_(rtpengine),
       sdp_rewriter_(sdp_rewriter),
@@ -86,6 +89,18 @@ void ScscfService::on_sip_message(const ims::sip::SipMessage& msg) {
 }
 
 void ScscfService::handle_register(const ims::sip::SipMessage& msg) {
+  const std::string& impu = msg.from;
+  if (!impu.empty()) {
+    // Query Cx for user profile
+    auto profile = cx_.getUserProfile(impu);
+    if (!profile) {
+      ims::core::log()->warn("S-CSCF: No user profile found in Cx for impu={}", impu);
+      return;
+    }
+    ims::core::log()->debug("S-CSCF: Got user profile from Cx - impi={} impu={} registered={}",
+                          profile->impi, profile->impu, profile->registered);
+  }
+
   RegistrationContext ctx{};
   RegistrationStateMachine sm{auth_, realm_};
 
@@ -105,6 +120,11 @@ void ScscfService::handle_register(const ims::sip::SipMessage& msg) {
   if (decision.action == RegisterDecision::Action::Send200) {
     ims::core::log()->info("REGISTER 200 for aor={} contact={}", ctx.aor, ctx.contact);
     location_.upsert(ctx.aor, ctx.contact, ctx.ttl);
+
+    // Notify Cx (HSS) of registration - SAR
+    cx_.serverAssignment(msg.from, msg.from,
+                        ims::cx::ICxClient::ServerAssignmentType::REGISTRATION);
+
     sip_.send_response_200_simple(msg, ctx.contact, "", "application/sdp");
     return;
   }

@@ -10,6 +10,7 @@
 #include <array>
 #include <cctype>
 #include <chrono>
+#include <cstring>
 #include <iomanip>
 #include <mutex>
 #include <random>
@@ -167,13 +168,19 @@ static bool digest_verify_rfc2617(const std::unordered_map<std::string, std::str
   return expected == response;
 }
 
-DigestAuthProvider::DigestAuthProvider(std::unordered_map<std::string, std::string> user_passwords)
-    : user_passwords_(std::move(user_passwords)) {}
+DigestAuthProvider::DigestAuthProvider(std::unordered_map<std::string, std::string> user_passwords, bool ipsec_enabled)
+    : user_passwords_(std::move(user_passwords)), ipsec_enabled_(ipsec_enabled) {}
 
 std::optional<AuthChallenge> DigestAuthProvider::getChallenge(const AuthRequest& req) {
   AuthChallenge ch{};
   ch.nonce = random_nonce();
   ch.www_authenticate = "Digest realm=\"" + req.realm + "\", nonce=\"" + ch.nonce + "\", algorithm=MD5, qop=\"auth\"";
+
+  if (ipsec_enabled_) {
+    ch.www_authenticate += ", integrity-protected=\"yes\"";
+    nonce_integrity_required_[ch.nonce] = true;
+  }
+
   return ch;
 }
 
@@ -182,8 +189,22 @@ bool DigestAuthProvider::verifyResponse(const AuthResponse& rsp) {
   auto kv = parse_digest_kv(rsp.authorization_header);
   const auto username = kv["username"];
   const auto realm = kv["realm"];
-  if (username.empty() || realm.empty()) return false;
+  const auto nonce = kv["nonce"];
+  if (username.empty() || realm.empty() || nonce.empty()) return false;
   if (realm != rsp.realm) return false;
+
+  // Check if we sent integrity-protected="yes" for this nonce
+  auto integrity_it = nonce_integrity_required_.find(nonce);
+  if (integrity_it != nonce_integrity_required_.end()) {
+    // If we sent it, UE must echo it back
+    const auto integrity_protected = kv.count("integrity-protected") ? kv.at("integrity-protected") : "";
+    if (integrity_protected != "yes") {
+      ims::core::log()->warn("Digest verify failed: missing or invalid integrity-protected parameter for nonce={}", nonce);
+      return false;
+    }
+    // Remove from tracking since nonce is one-time use
+    nonce_integrity_required_.erase(integrity_it);
+  }
 
   auto it = user_passwords_.find(username);
   if (it == user_passwords_.end()) return false;
@@ -274,7 +295,21 @@ static bool milenage_generate_autn_xres(const unsigned char opc[16],
   return true;
 }
 
-AkaAuthProvider::AkaAuthProvider(std::unordered_map<std::string, AkaUserProfile> users) : users_(std::move(users)) {}
+AkaAuthProvider::AkaAuthProvider(std::unordered_map<std::string, AkaUserProfile> users, bool ipsec_enabled)
+    : users_(std::move(users)), ipsec_enabled_(ipsec_enabled) {
+  // 初始化每个用户的 current_sqn_（从配置的 sqn_hex 解析而来）
+  for (const auto& [impi, profile] : users_) {
+    auto sqn_bytes = hex_to_bytes(profile.sqn_hex);
+    if (sqn_bytes && sqn_bytes->size() == 6) {
+      // 将 6 字节 SQN 转换为 uint64_t
+      uint64_t sqn = 0;
+      for (std::size_t i = 0; i < 6; ++i) {
+        sqn = (sqn << 8) | (*sqn_bytes)[i];
+      }
+      current_sqn_[impi] = sqn;
+    }
+  }
+}
 
 std::optional<AuthChallenge> AkaAuthProvider::getChallenge(const AuthRequest& req) {
   auto it = users_.find(req.impi);
@@ -285,17 +320,45 @@ std::optional<AuthChallenge> AkaAuthProvider::getChallenge(const AuthRequest& re
 
   const auto k = hex_to_bytes(it->second.k_hex);
   const auto opc = hex_to_bytes(it->second.opc_hex);
-  const auto sqn = hex_to_bytes(it->second.sqn_hex);
   const auto amf = hex_to_bytes(it->second.amf_hex);
-  if (!k || !opc || !sqn || !amf || k->size() != 16 || opc->size() != 16 || sqn->size() != 6 || amf->size() != 2) {
+  if (!k || !opc || !amf || k->size() != 16 || opc->size() != 16 || amf->size() != 2) {
     ims::core::log()->warn("AKA profile invalid impi={}", req.impi);
     return std::nullopt;
+  }
+
+  // 获取当前用户的 SQN（线程安全）
+  uint64_t sqn_val;
+  {
+    std::lock_guard<std::mutex> lock(sqn_mutex_);
+    auto sqn_it = current_sqn_.find(req.impi);
+    if (sqn_it == current_sqn_.end()) {
+      // 如果没有 current_sqn_，尝试从配置初始化
+      auto sqn_bytes = hex_to_bytes(it->second.sqn_hex);
+      if (!sqn_bytes || sqn_bytes->size() != 6) {
+        ims::core::log()->warn("AKA profile sqn invalid impi={}", req.impi);
+        return std::nullopt;
+      }
+      sqn_val = 0;
+      for (std::size_t i = 0; i < 6; ++i) {
+        sqn_val = (sqn_val << 8) | (*sqn_bytes)[i];
+      }
+      current_sqn_[req.impi] = sqn_val;
+    } else {
+      sqn_val = sqn_it->second;
+    }
+  }
+
+  // 将 uint64_t SQN 转换为 6 字节数组
+  unsigned char sqn_bytes[6]{};
+  for (int i = 5; i >= 0; --i) {
+    sqn_bytes[i] = static_cast<unsigned char>(sqn_val & 0xFF);
+    sqn_val >>= 8;
   }
 
   auto rand16 = random_rand16();
   unsigned char autn[16]{};
   unsigned char xres[8]{};
-  (void)milenage_generate_autn_xres(opc->data(), amf->data(), k->data(), sqn->data(), rand16.data(), autn, xres);
+  (void)milenage_generate_autn_xres(opc->data(), amf->data(), k->data(), sqn_bytes, rand16.data(), autn, xres);
 
   // nonce = base64(RAND || AUTN)
   unsigned char nonce_raw[32]{};
@@ -315,6 +378,11 @@ std::optional<AuthChallenge> AkaAuthProvider::getChallenge(const AuthRequest& re
   ch.www_authenticate = "Digest realm=\"" + req.realm +
                         "\", nonce=\"" + nonce_b64 +
                         "\", algorithm=AKAv1-MD5, qop=\"auth\"";
+
+  if (ipsec_enabled_) {
+    ch.www_authenticate += ", integrity-protected=\"yes\"";
+  }
+
   return ch;
 }
 
@@ -328,6 +396,15 @@ bool AkaAuthProvider::verifyResponse(const AuthResponse& rsp) {
 
   if (username.empty() || realm.empty() || nonce.empty()) return false;
   if (realm != rsp.realm) return false;
+
+  // Validate integrity-protected parameter if IPsec is enabled
+  if (ipsec_enabled_) {
+    const auto integrity_protected = kv.count("integrity-protected") ? kv.at("integrity-protected") : "";
+    if (integrity_protected != "yes") {
+      ims::core::log()->warn("AKA verify failed: missing or invalid integrity-protected parameter for nonce={}", nonce);
+      return false;
+    }
+  }
   if (!algo.empty()) {
     const auto a = algo;
     if (a != "AKAv1-MD5" && a != "AKAv2-MD5") {
@@ -347,14 +424,112 @@ bool AkaAuthProvider::verifyResponse(const AuthResponse& rsp) {
     return false;
   }
 
-  // use XRES as "password" for RFC2617 digest
+  // 检查是否有 AUTS 参数（SQN 不同步的重同步请求）
+  if (kv.count("auts")) {
+    const auto auts_b64 = kv.at("auts");
+    auto auts_bytes = b64_decode(auts_b64);
+    if (!auts_bytes || auts_bytes->size() != 14) {
+      ims::core::log()->warn("AKA verify: invalid AUTS length username={}", username);
+      nonce_db_.erase(it);
+      return false;
+    }
+
+    // AUTS = MAC-S (8 bytes) + SQN⊕AK (6 bytes)
+    unsigned char mac_s[8];
+    unsigned char sqn_xor_ak[6];
+    std::memcpy(mac_s, auts_bytes->data(), 8);
+    std::memcpy(sqn_xor_ak, auts_bytes->data() + 8, 6);
+
+    // 获取用户配置
+    auto user_it = users_.find(username);
+    if (user_it == users_.end()) {
+      nonce_db_.erase(it);
+      return false;
+    }
+
+    const auto k = hex_to_bytes(user_it->second.k_hex);
+    const auto opc = hex_to_bytes(user_it->second.opc_hex);
+    const auto amf = hex_to_bytes(user_it->second.amf_hex);
+    if (!k || !opc || !amf || k->size() != 16 || opc->size() != 16 || amf->size() != 2) {
+      ims::core::log()->warn("AKA profile invalid impi={}", username);
+      nonce_db_.erase(it);
+      return false;
+    }
+
+    // 解析 nonce 为 RAND || AUTN
+    auto nonce_decoded = b64_decode(nonce);
+    if (!nonce_decoded || nonce_decoded->size() != 32) {
+      ims::core::log()->warn("AKA verify: invalid nonce format username={}", username);
+      nonce_db_.erase(it);
+      return false;
+    }
+
+    unsigned char rand[16];
+    std::memcpy(rand, nonce_decoded->data(), 16);
+
+    // 生成 AK（用于 SQN 计算）
+    unsigned char ak[6];
+    unsigned char res_tmp[8];
+    milenage_f2345(opc->data(), k->data(), rand, res_tmp, ak);
+
+    // 计算 SQN（SQN = (SQN⊕AK) ⊕ AK）
+    unsigned char sqn_resync[6];
+    for (int i = 0; i < 6; ++i) {
+      sqn_resync[i] = sqn_xor_ak[i] ^ ak[i];
+    }
+
+    // 校验 AUTS 中的 MAC-S（需要使用 f1 算法验证）
+    unsigned char mac_a[8];
+    milenage_f1(opc->data(), k->data(), rand, sqn_resync, amf->data(), mac_a);
+
+    bool mac_valid = true;
+    for (int i = 0; i < 8; ++i) {
+      if (mac_s[i] != mac_a[i]) {
+        mac_valid = false;
+        break;
+      }
+    }
+
+    if (mac_valid) {
+      // 重同步成功，更新 stored SQN 为新值
+      uint64_t sqn_val = 0;
+      for (std::size_t i = 0; i < 6; ++i) {
+        sqn_val = (sqn_val << 8) | sqn_resync[i];
+      }
+
+      std::lock_guard<std::mutex> lock(sqn_mutex_);
+      current_sqn_[username] = sqn_val;
+      ims::core::log()->info("AKA resync success username={}, new SQN={}", username, sqn_val);
+    } else {
+      ims::core::log()->warn("AKA resync failed username={}, MAC verification failed", username);
+    }
+
+    // 删除使用过的 nonce（无论成功与否）
+    nonce_db_.erase(it);
+
+    // 总是返回 false 以要求 UE 发送新的挑战（使用同步后的 SQN）
+    return false;
+  }
+
+  // 正常鉴权逻辑（无 AUTS）
   const auto method = rsp.method.empty() ? "REGISTER" : rsp.method;
   const bool ok = digest_verify_rfc2617(kv, method, st.xres_hex);
   if (!ok) {
     ims::core::log()->warn("AKA verify failed username={} realm={}", username, realm);
+    nonce_db_.erase(it);
     return false;
   }
-  // one-time nonce
+
+  // 鉴权成功，递增 SQN
+  {
+    std::lock_guard<std::mutex> lock(sqn_mutex_);
+    auto sqn_it = current_sqn_.find(username);
+    if (sqn_it != current_sqn_.end()) {
+      sqn_it->second += 1;
+      ims::core::log()->debug("AKA verify success, incremented SQN to {}", sqn_it->second);
+    }
+  }
+
   nonce_db_.erase(it);
   return true;
 }
