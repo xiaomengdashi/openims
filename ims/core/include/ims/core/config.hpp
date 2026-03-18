@@ -71,6 +71,37 @@ struct CxConfig {
   ServerCapabilities default_capabilities;
 };
 
+// N5 interface configuration (P-CSCF <-> PCF)
+// 3GPP TS 29.514 Npcf_PolicyAuthorization
+struct N5Config {
+  bool enabled{false};
+  std::string pcf_address{"127.0.0.1"};
+  std::uint16_t pcf_port{8080};
+  int timeout_ms{5000};
+  bool use_tls{false};
+
+  // QoS mapping configuration
+  struct QosMappingConfig {
+    int voice_5qi{1};
+    int video_5qi{2};
+    int signaling_5qi{5};
+    int default_voice_bitrate_kbps{64};
+    int default_video_bitrate_kbps{384};
+  } qos_mapping;
+};
+
+// Diameter Cx client configuration (S-CSCF <-> UDM/HSS)
+// Uses freeDiameter library
+struct DiameterCxConfig {
+  bool enabled{false};
+  std::string origin_host{"scscf.ims.local"};
+  std::string origin_realm{"ims.local"};
+  std::string destination_host{"hss.ims.local"};
+  std::string destination_realm{"ims.local"};
+  std::string config_file{"/etc/freeDiameter/freeDiameter.conf"};
+  int timeout_ms{5000};
+};
+
 struct AppConfig {
   SipEndpointConfig pcscf;
   SipEndpointConfig icscf;
@@ -124,6 +155,8 @@ struct AppConfig {
   AuthConfig auth;
   CxConfig cx;
   DhcpConfig dhcp;
+  N5Config n5;
+  DiameterCxConfig diameter_cx;
   std::string realm{"ims.local"};
 };
 

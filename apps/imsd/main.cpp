@@ -14,6 +14,10 @@
 #include "ims/storage/location_service.hpp"
 #include "ims/storage/subscription_service.hpp"
 
+#ifdef IMS_HAS_NGHTTP2
+#include "ims/n5/n5_client.hpp"
+#endif
+
 #include <chrono>
 #include <thread>
 
@@ -115,6 +119,27 @@ int main(int argc, char** argv) {
       .scscf_sip_uri = cfg.routing.icscf_to_scscf_uri
   });
   ims::pcscf::PcscfService pcscf(sip, icscf);
+
+#ifdef IMS_HAS_NGHTTP2
+  // Initialize N5 client if enabled
+  if (cfg.n5.enabled) {
+    ims::n5::N5ClientConfig n5_cfg;
+    n5_cfg.enabled = cfg.n5.enabled;
+    n5_cfg.pcf_address = cfg.n5.pcf_address;
+    n5_cfg.pcf_port = cfg.n5.pcf_port;
+    n5_cfg.timeout_ms = cfg.n5.timeout_ms;
+    n5_cfg.use_tls = cfg.n5.use_tls;
+    n5_cfg.qos_mapping.voice_5qi = static_cast<ims::n5::FiveQI>(cfg.n5.qos_mapping.voice_5qi);
+    n5_cfg.qos_mapping.video_5qi = static_cast<ims::n5::FiveQI>(cfg.n5.qos_mapping.video_5qi);
+    n5_cfg.qos_mapping.signaling_5qi = static_cast<ims::n5::FiveQI>(cfg.n5.qos_mapping.signaling_5qi);
+    n5_cfg.qos_mapping.default_voice_bitrate_kbps = cfg.n5.qos_mapping.default_voice_bitrate_kbps;
+    n5_cfg.qos_mapping.default_video_bitrate_kbps = cfg.n5.qos_mapping.default_video_bitrate_kbps;
+
+    auto n5_client = ims::n5::createN5Client(n5_cfg);
+    pcscf.set_n5_client(std::move(n5_client));
+    ims::core::log()->info("N5 client initialized (PCF: {}:{})", cfg.n5.pcf_address, cfg.n5.pcf_port);
+  }
+#endif
 
   sip.set_on_message([&](const ims::sip::SipMessage& msg) { pcscf.on_sip_message(msg); });
   (void)sip.start_udp(cfg.pcscf.bind_ip, cfg.pcscf.port);

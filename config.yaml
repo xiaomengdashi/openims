@@ -74,3 +74,29 @@ dhcp:
   pool_end: "192.168.1.200"
   lease_time_seconds: 3600
 
+# Optional: N5 interface (P-CSCF <-> PCF policy control)
+# 3GPP TS 29.514 Npcf_PolicyAuthorization
+n5:
+  enabled: false
+  pcf_address: "127.0.0.1"
+  pcf_port: 8080
+  timeout_ms: 5000
+  use_tls: false
+  qos_mapping:
+    voice_5qi: 1
+    video_5qi: 2
+    signaling_5qi: 5
+    default_voice_bitrate_kbps: 64
+    default_video_bitrate_kbps: 384
+
+# Optional: Diameter Cx interface (S-CSCF <-> UDM/HSS)
+# Uses freeDiameter library
+cx_diameter:
+  enabled: false
+  origin_host: "scscf.ims.local"
+  origin_realm: "ims.local"
+  destination_host: "hss.ims.local"
+  destination_realm: "ims.local"
+  config_file: "/etc/freeDiameter/freeDiameter.conf"
+  timeout_ms: 5000
+

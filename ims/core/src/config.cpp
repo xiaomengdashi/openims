@@ -117,6 +117,36 @@ static CxConfig parse_cx(const YAML::Node& n, CxConfig def) {
   return def;
 }
 
+static N5Config parse_n5(const YAML::Node& n, N5Config def) {
+  if (!n) return def;
+  if (n["enabled"]) def.enabled = n["enabled"].as<bool>();
+  if (n["pcf_address"]) def.pcf_address = n["pcf_address"].as<std::string>();
+  if (n["pcf_port"]) def.pcf_port = n["pcf_port"].as<std::uint16_t>();
+  if (n["timeout_ms"]) def.timeout_ms = n["timeout_ms"].as<int>();
+  if (n["use_tls"]) def.use_tls = n["use_tls"].as<bool>();
+  if (n["qos_mapping"]) {
+    const auto& qos = n["qos_mapping"];
+    if (qos["voice_5qi"]) def.qos_mapping.voice_5qi = qos["voice_5qi"].as<int>();
+    if (qos["video_5qi"]) def.qos_mapping.video_5qi = qos["video_5qi"].as<int>();
+    if (qos["signaling_5qi"]) def.qos_mapping.signaling_5qi = qos["signaling_5qi"].as<int>();
+    if (qos["default_voice_bitrate_kbps"]) def.qos_mapping.default_voice_bitrate_kbps = qos["default_voice_bitrate_kbps"].as<int>();
+    if (qos["default_video_bitrate_kbps"]) def.qos_mapping.default_video_bitrate_kbps = qos["default_video_bitrate_kbps"].as<int>();
+  }
+  return def;
+}
+
+static DiameterCxConfig parse_diameter_cx(const YAML::Node& n, DiameterCxConfig def) {
+  if (!n) return def;
+  if (n["enabled"]) def.enabled = n["enabled"].as<bool>();
+  if (n["origin_host"]) def.origin_host = n["origin_host"].as<std::string>();
+  if (n["origin_realm"]) def.origin_realm = n["origin_realm"].as<std::string>();
+  if (n["destination_host"]) def.destination_host = n["destination_host"].as<std::string>();
+  if (n["destination_realm"]) def.destination_realm = n["destination_realm"].as<std::string>();
+  if (n["config_file"]) def.config_file = n["config_file"].as<std::string>();
+  if (n["timeout_ms"]) def.timeout_ms = n["timeout_ms"].as<int>();
+  return def;
+}
+
 AppConfig load_config(const std::string& path) {
   AppConfig cfg{};
   YAML::Node root = YAML::LoadFile(path);
@@ -135,6 +165,8 @@ AppConfig load_config(const std::string& path) {
     if (root["routing"]["icscf_to_scscf_uri"]) cfg.routing.icscf_to_scscf_uri = root["routing"]["icscf_to_scscf_uri"].as<std::string>();
   }
   cfg.rtpengine = parse_rtpengine(root["rtpengine"], cfg.rtpengine);
+  cfg.n5 = parse_n5(root["n5"], cfg.n5);
+  cfg.diameter_cx = parse_diameter_cx(root["cx_diameter"], cfg.diameter_cx);
   if (root["auth"]) {
     if (root["auth"]["mode"]) cfg.auth.mode = root["auth"]["mode"].as<std::string>();
     if (root["auth"]["users"]) {
