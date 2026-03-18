@@ -7,6 +7,20 @@
 
 namespace ims::cx {
 
+bool UserProfile::has_identity(const std::string& identity) const {
+  // Check if identity is in IMPUs
+  for (const auto& i : impus) {
+    if (i == identity) return true;
+  }
+  // Check if identity is in PSIs
+  for (const auto& p : psis) {
+    if (p == identity) return true;
+  }
+  // Check if identity matches IMPI directly
+  if (identity == impi) return true;
+  return false;
+}
+
 StubCxClient::StubCxClient(Config cfg)
     : cfg_(std::move(cfg)) {}
 
@@ -95,30 +109,39 @@ bool StubCxClient::serverAssignment(const std::string& impi, const std::string& 
   return false;
 }
 
-std::optional<UserProfile> StubCxClient::getUserProfile(const std::string& impu) {
-  ims::core::log()->debug("Cx: Querying user profile for impu={}", impu);
+std::optional<UserProfile> StubCxClient::getUserProfile(const std::string& identity) {
+  ims::core::log()->debug("Cx: Querying user profile for identity={}", identity);
 
   // MVP: Return static profile based on config
   UserProfile profile;
-  profile.impu = impu;
-  profile.registered = registered_users_.contains(impu);
+  profile.registered = registered_users_.contains(identity);
 
-  // Find IMPI by IMPU (simplified for MVP)
+  // Find IMPI by identity - first check AKA users
   for (const auto& [impi, user] : cfg_.aka_users) {
-    // Assume impu contains impi
-    if (impu.find(impi) != std::string::npos) {
+    if (impi == identity || identity.find(impi) != std::string::npos) {
       profile.impi = impi;
+      profile.impus.push_back(identity);
       profile.aka_profile = user;
       break;
     }
   }
 
-  // Check if we have digest password
-  for (const auto& [username, password] : cfg_.md5_users) {
-    if (impu.find(username) != std::string::npos) {
-      profile.digest_password = password;
-      break;
+  // If not found in AKA, check MD5 users
+  if (profile.impi.empty()) {
+    for (const auto& [username, password] : cfg_.md5_users) {
+      if (username == identity || identity.find(username) != std::string::npos) {
+        profile.impi = username;
+        profile.impus.push_back(identity);
+        profile.digest_password = password;
+        break;
+      }
     }
+  }
+
+  // If still not found, check if this is a registered user by any other name
+  if (profile.impi.empty() && !profile.registered) {
+    ims::core::log()->warn("Cx: No profile found for identity={}", identity);
+    return std::nullopt;
   }
 
   profile.scscf_capabilities = cfg_.default_capabilities;

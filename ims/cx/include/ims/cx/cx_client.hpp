@@ -19,14 +19,18 @@ struct ServerCapabilities {
 
 // User profile response from HSS
 struct UserProfile {
-  std::string impi;  // Private Identity
-  std::string impu;  // Public Identity
+  std::string impi;                    // Private Identity (IMPI) - 唯一私有标识
+  std::vector<std::string> impus;      // Public Identities (IMPUs) - 一个用户可以有多个公共标识
+  std::vector<std::string> psis;       // Public Service Identities (PSIs) - IMS 公共服务标识
   bool registered{false};
   ServerCapabilities scscf_capabilities;
   // AKA profile if available
   std::optional<ims::auth::AkaUserProfile> aka_profile;
   // Digest password if available
   std::optional<std::string> digest_password;
+
+  // Check if this profile includes a specific IMPU/PSI
+  bool has_identity(const std::string& identity) const;
 };
 
 // Authentication vector request/response

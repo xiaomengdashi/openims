@@ -97,7 +97,36 @@ void ScscfService::on_sip_message(const ims::sip::SipMessage& msg) {
 }
 
 void ScscfService::handle_register(const ims::sip::SipMessage& msg) {
-  const std::string& impu = msg.from;
+  // Extract IMPU (public identity):
+  // 1. Check P-Preferred-Identity (if present)
+  // 2. Check P-Asserted-Identity (if present)
+  // 3. Fallback to From header
+  std::string impu = msg.from;
+  auto preferred = msg.get_header("P-Preferred-Identity");
+  if (preferred) {
+    // Extract URI from header (sip:user@domain)
+    impu = *preferred;
+    // Remove < > if present
+    if (impu.starts_with('<') && impu.ends_with('>')) {
+      impu = impu.substr(1, impu.size() - 2);
+    }
+    // Remove "sip:" prefix if present
+    if (impu.starts_with("sip:")) {
+      impu = impu.substr(4);
+    }
+  } else {
+    auto asserted = msg.get_header("P-Asserted-Identity");
+    if (asserted) {
+      impu = *asserted;
+      if (impu.starts_with('<') && impu.ends_with('>')) {
+        impu = impu.substr(1, impu.size() - 2);
+      }
+      if (impu.starts_with("sip:")) {
+        impu = impu.substr(4);
+      }
+    }
+  }
+
   if (!impu.empty()) {
     // Query Cx for user profile
     auto profile = cx_.getUserProfile(impu);
@@ -105,8 +134,8 @@ void ScscfService::handle_register(const ims::sip::SipMessage& msg) {
       ims::core::log()->warn("S-CSCF: No user profile found in Cx for impu={}", impu);
       return;
     }
-    ims::core::log()->debug("S-CSCF: Got user profile from Cx - impi={} impu={} registered={}",
-                          profile->impi, profile->impu, profile->registered);
+    ims::core::log()->debug("S-CSCF: Got user profile from Cx - impi={} num_impus={} registered={}",
+                          profile->impi, profile->impus.size(), profile->registered);
   }
 
   RegistrationContext ctx{};
@@ -135,7 +164,13 @@ void ScscfService::handle_register(const ims::sip::SipMessage& msg) {
     }
 
     // Notify Cx (HSS) of registration - SAR
-    cx_.serverAssignment(msg.from, msg.from,
+    // Get the resolved IMPI from profile if available
+    std::string resolved_impi = impu;
+    auto profile = cx_.getUserProfile(impu);
+    if (profile) {
+      resolved_impi = profile->impi;
+    }
+    cx_.serverAssignment(resolved_impi, impu,
                         ims::cx::ICxClient::ServerAssignmentType::REGISTRATION);
 
     // Notify all reg-event subscribers of the registration state change

@@ -14,6 +14,7 @@
 - ✅ QoS HTTP Webhook 通知
 - ✅ SIP 代理转发，基础头域处理
 - ✅ DHCP-based P-CSCF Discovery (DHCPv4 Option 15 + Option 120)
+- ✅ SUBSCRIBE/NOTIFY 订阅通知（reg-event / dialog-event）
 
 ---
 
@@ -91,7 +92,12 @@
 
 ### 11. **IMS 公共服务标识（PSI）和 IMS 公共用户标识（IMPU）处理**
 - **缺失描述**：当前对用户标识的处理比较简化，需要完整支持 IMPU/IMPI 映射。
-- **优先级**：P2 - 低
+- **改进内容**：✅ 已改进：
+  - `UserProfile` 现在支持一个 IMPI 绑定多个 IMPU
+  - 添加 PSI (Public Service Identities) 支持
+  - 在 REGISTER 中正确解析 `P-Preferred-Identity` 和 `P-Asserted-Identity` 头域获取 IMPU
+  - 添加 `has_identity()` 方法检查 profile 是否包含指定标识
+- **优先级**：P2 - 低 ✅ 已完成基础支持
 
 ### 12. **Session Transfer 和连续性**
 - **缺失描述**：不支持切换中的会话转移。
@@ -130,11 +136,12 @@
 ## 总结优先级
 
 **P0（必须尽快实现）：**
-1. DNS NAPTR/SRV 路由
+1. DNS NAPTR/SRV 路由 *（框架已创建，待实现查询逻辑）*
 2. ~~DHCP Option 120 (标准 P-CSCF 发现)~~ ✅ 已完成 MVP
-3. Cx 接口（Diameter）对接 HSS
-4. SIP 鉴权完整性保护
-5. IMS AKA 重同步
+3. Cx 接口（Diameter）对接 HSS *（stub 框架已创建，完整 Diameter 协议待实现）*
+4. ~~SUBSCRIBE/NOTIFY 订阅通知~~ ✅ 已完成（reg-event / dialog-event）
+5. SIP 鉴权完整性保护
+6. IMS AKA 重同步
 
 **P1（基本通话正常后实现）：**
 6. Rx 接口对接 PCRF
@@ -154,3 +161,4 @@
 
 - **2026-03-18**：添加 DHCP Option 15 实现，更新文档。
 - **2026-03-18**：添加 DHCP Option 120 实现，完成标准 3GPP P-CSCF 发现 MVP。
+- **2026-03-19**：实现 SUBSCRIBE/NOTIFY 订阅通知，支持 reg-event (RFC 3680) 和 dialog-event (RFC 4235)。
