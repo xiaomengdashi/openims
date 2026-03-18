@@ -63,6 +63,8 @@ target_sources(ims_lib PRIVATE
   ims/media/src/sdp_rewriter.cpp
   ims/dhcp/src/dhcp_server.cpp
   ims/dns/src/dns_resolver.cpp
+  ims/storage/src/subscription_service.cpp
+  ims/scscf/src/subscription_sm.cpp
 )
 target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}

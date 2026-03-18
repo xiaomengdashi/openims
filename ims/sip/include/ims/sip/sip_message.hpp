@@ -6,7 +6,7 @@
 
 namespace ims::sip {
 
-enum class Method { Register, Invite, Ack, Bye, Unknown };
+enum class Method { Register, Invite, Ack, Bye, Subscribe, Notify, Unknown };
 
 struct SipHeader {
   std::string name;

@@ -354,6 +354,12 @@ bool SipStack::forward_request(const SipMessage& req, const std::string& target_
     case Method::Bye:
       method = "BYE";
       break;
+    case Method::Subscribe:
+      method = "SUBSCRIBE";
+      break;
+    case Method::Notify:
+      method = "NOTIFY";
+      break;
     default:
       method = "INVITE";
       break;

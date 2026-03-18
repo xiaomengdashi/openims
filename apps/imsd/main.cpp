@@ -12,6 +12,7 @@
 #include "ims/scscf/scscf_service.hpp"
 #include "ims/sip/sip_stack.hpp"
 #include "ims/storage/location_service.hpp"
+#include "ims/storage/subscription_service.hpp"
 
 #include <chrono>
 #include <thread>
@@ -58,6 +59,7 @@ int main(int argc, char** argv) {
   });
 
   ims::storage::LocationService location;
+  ims::storage::SubscriptionService subscriptions;
   std::unique_ptr<ims::auth::IAuthProvider> auth;
   if (cfg.auth.mode == "md5") {
     auth = std::make_unique<ims::auth::DigestAuthProvider>(cfg.auth.users, cfg.ipsec.enabled);
@@ -98,7 +100,7 @@ int main(int argc, char** argv) {
   });
 
   // Create S-CSCF with Cx client
-  ims::scscf::ScscfService scscf(sip, *auth, cx_client, location, rtpengine, sdp_rewriter, cfg.realm, &qos_hook);
+  ims::scscf::ScscfService scscf(sip, *auth, cx_client, location, subscriptions, rtpengine, sdp_rewriter, cfg.realm, &qos_hook);
 
   // Create DNS resolver if enabled
   std::unique_ptr<ims::dns::DnsResolver> dns_resolver;

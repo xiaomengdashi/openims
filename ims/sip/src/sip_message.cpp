@@ -16,6 +16,8 @@ Method parse_method(const std::string& m) {
   if (lm == "invite") return Method::Invite;
   if (lm == "ack") return Method::Ack;
   if (lm == "bye") return Method::Bye;
+  if (lm == "subscribe") return Method::Subscribe;
+  if (lm == "notify") return Method::Notify;
   return Method::Unknown;
 }
 

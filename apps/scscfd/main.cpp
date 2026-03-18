@@ -7,6 +7,7 @@
 #include "ims/scscf/scscf_service.hpp"
 #include "ims/sip/sip_stack.hpp"
 #include "ims/storage/location_service.hpp"
+#include "ims/storage/subscription_service.hpp"
 
 #include <chrono>
 #include <thread>
@@ -25,6 +26,7 @@ int main(int argc, char** argv) {
 
   ims::sip::SipStack sip;
   ims::storage::LocationService location;
+  ims::storage::SubscriptionService subscriptions;
   std::unique_ptr<ims::auth::IAuthProvider> auth;
   if (cfg.auth.mode == "md5") {
     auth = std::make_unique<ims::auth::DigestAuthProvider>(cfg.auth.users, cfg.ipsec.enabled);
@@ -49,7 +51,7 @@ int main(int argc, char** argv) {
 
   ims::media::RtpEngineClient rtpengine(cfg.rtpengine.control_ip, cfg.rtpengine.control_port, cfg.rtpengine.media_public_ip);
   ims::media::SdpRewriter sdp_rewriter;
-  ims::scscf::ScscfService scscf(sip, *auth, cx_client, location, rtpengine, sdp_rewriter, cfg.realm);
+  ims::scscf::ScscfService scscf(sip, *auth, cx_client, location, subscriptions, rtpengine, sdp_rewriter, cfg.realm);
 
   sip.set_on_message([&](const ims::sip::SipMessage& msg) { scscf.on_sip_message(msg); });
   if (!sip.start_udp(cfg.scscf.bind_ip, cfg.scscf.port)) return 2;

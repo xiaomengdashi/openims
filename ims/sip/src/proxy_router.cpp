@@ -28,6 +28,10 @@ static std::string method_to_string(Method m) {
       return "ACK";
     case Method::Bye:
       return "BYE";
+    case Method::Subscribe:
+      return "SUBSCRIBE";
+    case Method::Notify:
+      return "NOTIFY";
     default:
       return "MESSAGE";
   }
@@ -56,8 +60,8 @@ void ProxyRouter::on_message(const SipMessage& msg) {
 
 bool ProxyRouter::should_record_route(const SipMessage& req) const {
   // Basic: dialog creating & mid-dialog routing (INVITE/SUBSCRIBE/NOTIFY/etc.)
-  // MVP only: INVITE
-  return req.start.is_request && req.start.method == Method::Invite;
+  return req.start.is_request &&
+    (req.start.method == Method::Invite || req.start.method == Method::Subscribe);
 }
 
 bool ProxyRouter::should_add_path(const SipMessage& req) const {
