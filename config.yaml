@@ -64,3 +64,13 @@ qos:
   # http_url: "http://127.0.0.1:8080/ims/qos"
   http_timeout_ms: 1500
 
+# Optional: DHCP server (for UE IP address assignment)
+dhcp:
+  enabled: true
+  bind_ip: "0.0.0.0"
+  port: 67
+  pcscf_address: "192.168.1.10"
+  pool_start: "192.168.1.101"
+  pool_end: "192.168.1.200"
+  lease_time_seconds: 3600
+

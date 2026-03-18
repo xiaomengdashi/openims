@@ -57,6 +57,18 @@ static AppConfig::QosHookConfig parse_qos(const YAML::Node& n, AppConfig::QosHoo
   return def;
 }
 
+static DhcpConfig parse_dhcp(const YAML::Node& n, DhcpConfig def) {
+  if (!n) return def;
+  if (n["enabled"]) def.enabled = n["enabled"].as<bool>();
+  if (n["bind_ip"]) def.bind_ip = n["bind_ip"].as<std::string>();
+  if (n["port"]) def.port = n["port"].as<std::uint16_t>();
+  if (n["pcscf_address"]) def.pcscf_address = n["pcscf_address"].as<std::string>();
+  if (n["pool_start"]) def.pool_start = n["pool_start"].as<std::string>();
+  if (n["pool_end"]) def.pool_end = n["pool_end"].as<std::string>();
+  if (n["lease_time_seconds"]) def.lease_time_seconds = n["lease_time_seconds"].as<int>();
+  return def;
+}
+
 AppConfig load_config(const std::string& path) {
   AppConfig cfg{};
   YAML::Node root = YAML::LoadFile(path);
@@ -67,6 +79,7 @@ AppConfig load_config(const std::string& path) {
   cfg.icscf_proxy = parse_proxy(root["icscf_proxy"], cfg.icscf_proxy);
   cfg.ipsec = parse_ipsec(root["ipsec"], cfg.ipsec);
   cfg.qos = parse_qos(root["qos"], cfg.qos);
+  cfg.dhcp = parse_dhcp(root["dhcp"], cfg.dhcp);
   if (root["routing"]) {
     if (root["routing"]["pcscf_to_icscf_uri"]) cfg.routing.pcscf_to_icscf_uri = root["routing"]["pcscf_to_icscf_uri"].as<std::string>();
     if (root["routing"]["icscf_to_scscf_uri"]) cfg.routing.icscf_to_scscf_uri = root["routing"]["icscf_to_scscf_uri"].as<std::string>();

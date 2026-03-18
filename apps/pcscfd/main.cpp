@@ -3,8 +3,10 @@
 #include "ims/ipsec/xfrm_manager.hpp"
 #include "ims/sip/proxy_router.hpp"
 #include "ims/sip/sip_stack.hpp"
+#include "ims/dhcp/dhcp_server.hpp"
 
 #include <chrono>
+#include <memory>
 #include <thread>
 
 int main(int argc, char** argv) {
@@ -60,8 +62,21 @@ int main(int argc, char** argv) {
   if (!sip.start_udp(cfg.pcscf.bind_ip, cfg.pcscf.port)) return 2;
   ims::core::log()->info("pcscfd started {}:{}", cfg.pcscf.bind_ip, cfg.pcscf.port);
 
+  // Optional: start DHCP server
+  std::unique_ptr<ims::dhcp::DhcpServer> dhcp_server;
+  if (cfg.dhcp.enabled) {
+    dhcp_server = std::make_unique<ims::dhcp::DhcpServer>(cfg.dhcp);
+    if (!dhcp_server->start()) {
+      ims::core::log()->error("Failed to start DHCP server");
+      return 4;
+    }
+  }
+
   while (true) {
     sip.poll_once(200);
+    if (dhcp_server) {
+      dhcp_server->poll_once(0); // Non-blocking poll
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 }

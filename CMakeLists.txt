@@ -60,6 +60,7 @@ target_sources(ims_lib PRIVATE
   ims/pcscf/src/pcscf_service.cpp
   ims/media/src/rtpengine_client.cpp
   ims/media/src/sdp_rewriter.cpp
+  ims/dhcp/src/dhcp_server.cpp
 )
 target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -73,6 +74,7 @@ target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/media/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/ipsec/include
   ${CMAKE_CURRENT_SOURCE_DIR}/ims/policy/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/ims/dhcp/include
 )
 target_link_libraries(ims_lib PUBLIC
   spdlog::spdlog

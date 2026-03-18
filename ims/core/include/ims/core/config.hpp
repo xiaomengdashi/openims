@@ -32,6 +32,16 @@ struct AuthConfig {
   std::unordered_map<std::string, AkaProfile> users_aka;
 };
 
+struct DhcpConfig {
+  bool enabled{false};
+  std::string bind_ip{"0.0.0.0"};
+  std::uint16_t port{67};  // Standard DHCPv4 server port
+  std::string pcscf_address;  // P-CSCF IPv4 for Option 15
+  std::string pool_start;     // IP address pool start
+  std::string pool_end;       // IP address pool end
+  int lease_time_seconds{3600};
+};
+
 struct AppConfig {
   SipEndpointConfig pcscf;
   SipEndpointConfig icscf;
@@ -82,6 +92,7 @@ struct AppConfig {
   } routing;
   RtpEngineConfig rtpengine;
   AuthConfig auth;
+  DhcpConfig dhcp;
   std::string realm{"ims.local"};
 };
 
