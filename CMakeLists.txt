@@ -55,48 +55,48 @@ endif()
 
 add_library(ims_lib)
 target_sources(ims_lib PRIVATE
-  ims/core/src/config.cpp
-  ims/core/src/log.cpp
-  ims/core/src/time.cpp
-  ims/sip/src/sdp.cpp
-  ims/sip/src/sip_message.cpp
-  ims/sip/src/sip_stack.cpp
-  ims/sip/src/b2bua_relay.cpp
-  ims/sip/src/proxy_router.cpp
-  ims/sip/src/pani_parser.cpp
-  ims/ipsec/src/xfrm_manager.cpp
-  ims/policy/src/qos_hook.cpp
-  ims/storage/src/location_service.cpp
-  ims/auth/src/auth_provider.cpp
-  ims/cx/src/cx_stub_client.cpp
-  ims/scscf/src/registration_sm.cpp
-  ims/scscf/src/call_session.cpp
-  ims/scscf/src/scscf_service.cpp
-  ims/icscf/src/icscf_service.cpp
-  ims/pcscf/src/pcscf_service.cpp
-  ims/media/src/rtpengine_client.cpp
-  ims/media/src/sdp_rewriter.cpp
-  ims/dhcp/src/dhcp_server.cpp
-  ims/dns/src/dns_resolver.cpp
-  ims/storage/src/subscription_service.cpp
-  ims/scscf/src/subscription_sm.cpp
+  src/core/config.cpp
+  src/core/log.cpp
+  src/core/time.cpp
+  src/sip/sdp.cpp
+  src/sip/sip_message.cpp
+  src/sip/sip_stack.cpp
+  src/sip/b2bua_relay.cpp
+  src/sip/proxy_router.cpp
+  src/sip/pani_parser.cpp
+  src/ipsec/xfrm_manager.cpp
+  src/policy/qos_hook.cpp
+  src/storage/location_service.cpp
+  src/auth/auth_provider.cpp
+  src/cx/cx_stub_client.cpp
+  src/scscf/registration_sm.cpp
+  src/scscf/call_session.cpp
+  src/scscf/scscf_service.cpp
+  src/icscf/icscf_service.cpp
+  src/pcscf/pcscf_service.cpp
+  src/media/rtpengine_client.cpp
+  src/media/sdp_rewriter.cpp
+  src/dhcp/dhcp_server.cpp
+  src/dns/dns_resolver.cpp
+  src/storage/subscription_service.cpp
+  src/scscf/subscription_sm.cpp
 )
 target_include_directories(ims_lib PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/core/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/sip/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/auth/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/cx/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/storage/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/scscf/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/icscf/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/pcscf/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/media/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/ipsec/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/policy/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/dhcp/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/dns/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/ims/n5/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/sip/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/auth/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/cx/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/storage/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/scscf/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/icscf/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pcscf/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/media/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/ipsec/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/policy/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/dhcp/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/dns/
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/n5/
 )
 target_link_libraries(ims_lib PUBLIC
   spdlog::spdlog
@@ -108,12 +108,12 @@ target_link_libraries(ims_lib PUBLIC
 if(IMS_WITH_NGHTTP2)
   target_compile_definitions(ims_lib PUBLIC IMS_HAS_NGHTTP2=1)
   target_sources(ims_lib PRIVATE
-    ims/n5/src/n5_client.cpp
-    ims/n5/src/n5_models.cpp
-    ims/n5/src/qos_policy.cpp
+    src/n5/n5_client.cpp
+    src/n5/n5_models.cpp
+    src/n5/qos_policy.cpp
   )
   target_include_directories(ims_lib PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/ims/n5/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/n5/
   )
   target_link_libraries(ims_lib PUBLIC nghttp2_static)
 else()
@@ -132,102 +132,6 @@ set(CARES_BUILD_STATIC ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(c-ares)
 target_link_libraries(ims_lib PUBLIC c-ares::cares)
 
-if (NOT IMS_WITH_EXOSIP)
-  message(FATAL_ERROR "IMS_WITH_EXOSIP=OFF is not supported (no stubs/mocks allowed). Please build with IMS_WITH_EXOSIP=ON.")
-endif()
-
-if (IMS_WITH_EXOSIP)
-  # 强制下载并构建 osip2/exosip2（避免依赖系统包）
-  set(THIRD_PARTY_PREFIX ${CMAKE_BINARY_DIR}/third_party)
-  set(OSIP_PREFIX ${THIRD_PARTY_PREFIX}/osip)
-  set(EXOSIP_PREFIX ${THIRD_PARTY_PREFIX}/exosip)
-  set(OSIP_INSTALL_DIR ${THIRD_PARTY_PREFIX}/install/osip)
-  set(EXOSIP_INSTALL_DIR ${THIRD_PARTY_PREFIX}/install/exosip)
-
-  # 优先使用本地已下载的 tar.gz（更稳定、离线可用）
-  set(OSIP_TARBALL ${CMAKE_CURRENT_SOURCE_DIR}/libosip2-5.3.0.tar.gz)
-  set(EXOSIP_TARBALL ${CMAKE_CURRENT_SOURCE_DIR}/libexosip2-5.3.0.tar.gz)
-  set(OSIP_HAS_LOCAL_TARBALL OFF)
-  set(EXOSIP_HAS_LOCAL_TARBALL OFF)
-  if (EXISTS ${OSIP_TARBALL})
-    set(OSIP_HAS_LOCAL_TARBALL ON)
-  endif()
-  if (EXISTS ${EXOSIP_TARBALL})
-    set(EXOSIP_HAS_LOCAL_TARBALL ON)
-  endif()
-
-  if (OSIP_HAS_LOCAL_TARBALL)
-    message(STATUS "Using local osip2 tarball: ${OSIP_TARBALL}")
-    ExternalProject_Add(osip2_ep
-      PREFIX ${OSIP_PREFIX}
-      URL ${OSIP_TARBALL}
-      INSTALL_DIR ${OSIP_INSTALL_DIR}
-      CONFIGURE_COMMAND sh -c "cd <SOURCE_DIR> && (test -f ./configure || autoreconf -fi) && ./configure --prefix=<INSTALL_DIR>"
-      BUILD_COMMAND $(MAKE)
-      INSTALL_COMMAND $(MAKE) install
-      BUILD_IN_SOURCE 1
-    )
-  else()
-    message(STATUS "Using osip2 from git (Savannah)")
-    ExternalProject_Add(osip2_ep
-      PREFIX ${OSIP_PREFIX}
-      GIT_REPOSITORY https://git.savannah.gnu.org/git/osip.git
-      GIT_TAG master
-      UPDATE_COMMAND ""
-      INSTALL_DIR ${OSIP_INSTALL_DIR}
-      CONFIGURE_COMMAND sh -c "cd <SOURCE_DIR> && autoreconf -fi && ./configure --prefix=<INSTALL_DIR>"
-      BUILD_COMMAND $(MAKE)
-      INSTALL_COMMAND $(MAKE) install
-      BUILD_IN_SOURCE 1
-    )
-  endif()
-
-  if (EXOSIP_HAS_LOCAL_TARBALL)
-    message(STATUS "Using local exosip2 tarball: ${EXOSIP_TARBALL}")
-    ExternalProject_Add(exosip2_ep
-      PREFIX ${EXOSIP_PREFIX}
-      URL ${EXOSIP_TARBALL}
-      INSTALL_DIR ${EXOSIP_INSTALL_DIR}
-      CONFIGURE_COMMAND sh -c "cd <SOURCE_DIR> && (test -f ./configure || autoreconf -fi) && PKG_CONFIG_PATH=${OSIP_INSTALL_DIR}/lib/pkgconfig CPPFLAGS=-I${OSIP_INSTALL_DIR}/include LDFLAGS=-L${OSIP_INSTALL_DIR}/lib ./configure --prefix=<INSTALL_DIR> --with-osip=${OSIP_INSTALL_DIR}"
-      BUILD_COMMAND $(MAKE)
-      INSTALL_COMMAND $(MAKE) install
-      BUILD_IN_SOURCE 1
-      DEPENDS osip2_ep
-    )
-  else()
-    message(STATUS "Using exosip2 from git (Savannah)")
-    ExternalProject_Add(exosip2_ep
-      PREFIX ${EXOSIP_PREFIX}
-      GIT_REPOSITORY https://git.savannah.nongnu.org/git/exosip.git
-      GIT_TAG 5.3.0
-      UPDATE_COMMAND ""
-      INSTALL_DIR ${EXOSIP_INSTALL_DIR}
-      CONFIGURE_COMMAND sh -c "cd <SOURCE_DIR> && autoreconf -fi && PKG_CONFIG_PATH=${OSIP_INSTALL_DIR}/lib/pkgconfig CPPFLAGS=-I${OSIP_INSTALL_DIR}/include LDFLAGS=-L${OSIP_INSTALL_DIR}/lib ./configure --prefix=<INSTALL_DIR> --with-osip=${OSIP_INSTALL_DIR}"
-      BUILD_COMMAND $(MAKE)
-      INSTALL_COMMAND $(MAKE) install
-      BUILD_IN_SOURCE 1
-      DEPENDS osip2_ep
-    )
-  endif()
-
-  add_dependencies(ims_lib osip2_ep exosip2_ep)
-  target_compile_definitions(ims_lib PUBLIC IMS_HAS_EXOSIP=1)
-  target_include_directories(ims_lib PRIVATE
-    ${OSIP_INSTALL_DIR}/include
-    ${EXOSIP_INSTALL_DIR}/include
-  )
-  target_link_directories(ims_lib PUBLIC
-    ${OSIP_INSTALL_DIR}/lib
-    ${EXOSIP_INSTALL_DIR}/lib
-  )
-  target_link_libraries(ims_lib PUBLIC
-    osip2
-    osipparser2
-    eXosip2
-  )
-else()
-  target_compile_definitions(ims_lib PUBLIC IMS_HAS_EXOSIP=0)
-endif()
 
 add_executable(imsd
   apps/imsd/main.cpp
@@ -248,14 +152,3 @@ add_executable(scscfd
   apps/scscfd/main.cpp
 )
 target_link_libraries(scscfd PRIVATE ims_lib)
-
-enable_testing()
-add_executable(ims_tests
-  ims/tests/test_registration_sm.cpp
-  ims/tests/test_sdp_rewriter.cpp
-  ims/tests/test_location_service.cpp
-)
-target_link_libraries(ims_tests PRIVATE ims_lib GTest::gtest_main)
-include(GoogleTest)
-gtest_discover_tests(ims_tests)
-

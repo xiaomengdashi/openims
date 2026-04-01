@@ -1,13 +1,13 @@
-#include "ims/auth/auth_provider.hpp"
-#include "ims/core/config.hpp"
-#include "ims/core/log.hpp"
-#include "ims/cx/cx_client.hpp"
-#include "ims/media/rtpengine_client.hpp"
-#include "ims/media/sdp_rewriter.hpp"
-#include "ims/scscf/scscf_service.hpp"
-#include "ims/sip/sip_stack.hpp"
-#include "ims/storage/location_service.hpp"
-#include "ims/storage/subscription_service.hpp"
+#include "src/auth/auth_provider.hpp"
+#include "src/core/config.hpp"
+#include "src/core/log.hpp"
+#include "src/cx/cx_client.hpp"
+#include "src/media/rtpengine_client.hpp"
+#include "src/media/sdp_rewriter.hpp"
+#include "src/scscf/scscf_service.hpp"
+#include "src/sip/sip_stack.hpp"
+#include "src/storage/location_service.hpp"
+#include "src/storage/subscription_service.hpp"
 
 #include <chrono>
 #include <thread>

@@ -23,7 +23,7 @@ apps/
 ├── icscfd/         - Standalone I-CSCF daemon
 └── scscfd/         - Standalone S-CSCF daemon
 
-ims/
+src/
 ├── core/           - Config loading (YAML), logging, time utilities
 ├── auth/           - Pluggable auth provider (MD5 + IMS AKA/Milenage)
 ├── storage/        - Location service (registration location storing)
@@ -39,8 +39,8 @@ ims/
 
 **Important architectural points:**
 *   `IMS_WITH_EXOSIP=ON` **must** always be used - building without eXosip2 is not supported (no stubs/mocks allowed)
-*   Authentication has a clean pluggable interface in `ims/auth/include/ims/auth/auth_provider.hpp`
-*   SIP stack is wrapped in `ims/sip/include/ims/sip/sip_stack.hpp` (pimpl pattern)
+*   Authentication has a clean pluggable interface in `src/auth/include/src/auth/auth_provider.hpp`
+*   SIP stack is wrapped in `src/sip/include/src/sip/sip_stack.hpp` (pimpl pattern)
 *   Registration state machine in `scscf`
 *   Can be deployed as all-in-one `imsd` or split into separate daemons
 
@@ -141,7 +141,7 @@ S-CSCF 会在以下时机触发事件：
 ```yaml
 qos:
   enabled: true
-  http_url: "http://127.0.0.1:8080/ims/qos"
+  http_url: "http://127.0.0.1:8080/src/qos"
   http_timeout_ms: 1500
 ```
 

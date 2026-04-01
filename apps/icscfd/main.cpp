@@ -1,7 +1,7 @@
-#include "ims/core/config.hpp"
-#include "ims/core/log.hpp"
-#include "ims/sip/proxy_router.hpp"
-#include "ims/sip/sip_stack.hpp"
+#include "src/core/config.hpp"
+#include "src/core/log.hpp"
+#include "src/sip/proxy_router.hpp"
+#include "src/sip/sip_stack.hpp"
 
 #include <chrono>
 #include <thread>

@@ -1,9 +1,9 @@
-#include "ims/core/config.hpp"
-#include "ims/core/log.hpp"
-#include "ims/ipsec/xfrm_manager.hpp"
-#include "ims/sip/proxy_router.hpp"
-#include "ims/sip/sip_stack.hpp"
-#include "ims/dhcp/dhcp_server.hpp"
+#include "src/core/config.hpp"
+#include "src/core/log.hpp"
+#include "src/ipsec/xfrm_manager.hpp"
+#include "src/sip/proxy_router.hpp"
+#include "src/sip/sip_stack.hpp"
+#include "src/dhcp/dhcp_server.hpp"
 
 #include <chrono>
 #include <memory>
